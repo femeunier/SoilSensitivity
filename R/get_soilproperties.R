@@ -1,15 +1,15 @@
 get_soilproperties <- function(sand = 0.5, clay = 0.5, model="ED", orc_map="zobler"){
 
+  wdns = 1.000e3
+  grav = 9.80665
+  day_sec = 86400
+
   if(model=="ED"){
 
     theta_sat = (50.5 - 14.2*sand - 3.7*clay)/100 # m³/m³
     psi_sat = -0.01*10^(2.17-1.58*sand-0.63*clay) # m
     b = 3.1-0.3*sand + 15.7*clay #unitless
     k_sat = 7.055556e-6*10^{-0.6+1.26*sand-0.64*clay} # m/s
-
-    wdns = 1.000e3
-    grav = 9.80665
-    day_sec = 86400
 
     fieldcp_K = 0.1 # kg/m²/day
     fieldcp_K_unit = fieldcp_K/wdns/day_sec # m/s
@@ -52,7 +52,9 @@ get_soilproperties <- function(sand = 0.5, clay = 0.5, model="ED", orc_map="zobl
     psi_sat = 10^(-logPsi_s)
     psi_wilt = 10^-4.2
     psi_whc = 10^-2
+    psi_fc = 10^-2.47
     theta_whc  = theta_sat * (psi_whc  / psi_sat)^(1/b)
+    theta_fc  = theta_sat * (psi_fc  / psi_sat)^(1/b)
     theta_wp = theta_sat * (psi_wilt / psi_sat)^(1/b) # wilting point as fraction of depth (Prentice 1992)
 
     # Then later in the code, for actual use in the rest of the model,
@@ -61,8 +63,8 @@ get_soilproperties <- function(sand = 0.5, clay = 0.5, model="ED", orc_map="zobl
     # and the texture dependent parameter b from Cosby 1984 was established
     # K = 5.87 - 0.29*b"
 
-    b_orig = b # saving it for "return"
-    b = 5.87 - 0.29*b
+    # b_orig = b # saving it for "return"
+    k_sat = 5.87 - 0.29*b # mm/d
 
     volumetric_whc_field_capacity = theta_whc - theta_wp # volWHC at field capacity minus volWHC at wilting point (Hmax), as fraction of soil depth
 
@@ -81,9 +83,9 @@ get_soilproperties <- function(sand = 0.5, clay = 0.5, model="ED", orc_map="zobl
 
     return(list(theta_sat = theta_sat,
                 theta_wp = theta_wp,
-                theta_fc = theta_whc, # I suppose this is the same
-                b = b_orig,
-                k_sat = NA, # not calculated I guess?
+                theta_fc = theta_whc, # I suppose this is the same or theta_fc
+                b = b,
+                k_sat = k_sat/86400/1000, # not calculated I guess?
                 psi_sat = psi_sat)) # maybe we'll need to add a minus sign?
 
 
@@ -104,7 +106,8 @@ get_soilproperties <- function(sand = 0.5, clay = 0.5, model="ED", orc_map="zobl
     usda_class<-soiltexture::TT.points.in.classes( tri.data = data.frame(CLAY=clay,
                                                                          SILT=silt,
                                                                          SAND=sand)
-                                                   ,class.sys   = "USDA.TT")
+                                                   ,class.sys   = "USDA.TT",
+                                                   PiC.type = "t")
     # USDA classification:
     # "Cl"     "SiCl"   "SaCl"   "ClLo"   "SiClLo" "SaClLo" "Lo"     "SiLo"   "SaLo"   "Si"     "LoSa"   "Sa"
     # Zobler classification
@@ -167,14 +170,17 @@ get_soilproperties <- function(sand = 0.5, clay = 0.5, model="ED", orc_map="zobl
       # "Cl"     "SiCl"   "SaCl"   "ClLo"   "SiClLo" "SaClLo" "Lo"     "SiLo"   "SaLo"   "Si"     "LoSa"   "Sa"
       # in Orchidee
       # "Sa" "LoSa" "SaLo" "SiLo" "Si" "Lo" "SaClLo" "SiClLo" "ClLo" "SaCl" "SiCl" "Cl"
+      mapping <-  c("Sa","LoSa","SaLo","SiLo","Si","Lo","SaClLo","SiClLo","ClLo","SaCl","SiCl","Cl")
       ord<-c(12,11,9,8,10,7:1)
-      soil_class<-usda_class[,ord]
+      usda_class <- as.factor(usda_class)
+      soil_class <- match(usda_class,mapping)
+      # soil_class<-usda_class[,ord]
 
       # REAL(r_std),PARAMETER,DIMENSION(nscm_usda) :: ks_usda = &              !! Hydraulic conductivity at saturation
       # & (/ 7128.0_r_std, 3501.6_r_std, 1060.8_r_std, 108.0_r_std, &           !!  @tex $(mm d^{-1})$ @endtex
       #    &    60.0_r_std, 249.6_r_std, 314.4_r_std, 16.8_r_std, &
       #      &    62.4_r_std, 28.8_r_std, 4.8_r_std, 48.0_r_std /)
-      ks_usda<-c(7128.0,3501.6,1060.8,108.0,60.0,249.6,314.4,16.8,62.4,28.8,4.8,48.0)
+      ks_usda<-c(7128.0,3501.6,1060.8,108.0,60.0,249.6,314.4,16.8,62.4,28.8,4.8,48.0)/wdns/day_sec
 
       # REAL(r_std),PARAMETER,DIMENSION(nscm_usda) :: nvan_usda = &            !! Van Genuchten coefficient n (unitless)
       # & (/ 2.68_r_std, 2.28_r_std, 1.89_r_std, 1.41_r_std, &                   !  RK: 1/n=1-m
@@ -198,7 +204,7 @@ get_soilproperties <- function(sand = 0.5, clay = 0.5, model="ED", orc_map="zobl
       # & (/ 0.43_r_std, 0.41_r_std, 0.41_r_std, 0.45_r_std, &                  !!  @tex $(m^{3} m^{-3})$ @endtex
       #    &    0.46_r_std, 0.43_r_std, 0.39_r_std, 0.43_r_std, &
       #      &    0.41_r_std, 0.38_r_std, 0.36_r_std, 0.38_r_std /)
-      theta_sat_usda<-c(0.43,0.41,0.41,0.45,0.46,0.43,0.39,0.43,0.41,0.38,0.36,0.38)
+      theta_s_usda<-c(0.43,0.41,0.41,0.45,0.46,0.43,0.39,0.43,0.41,0.38,0.36,0.38)
 
       # REAL(r_std),PARAMETER,DIMENSION(nscm_usda) :: mcf_usda = &             !! Volumetric water content at field capacity
       # & (/ 0.0493_r_std, 0.0710_r_std, 0.1218_r_std, 0.2402_r_std, &          !!  @tex $(m^{3} m^{-3})$ @endtex

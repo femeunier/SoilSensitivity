@@ -18,7 +18,7 @@ Y = seq(ED_REG_LATMIN,ED_REG_LATMAX-Delta_Y,Delta_Y)
 
 depths <- c("0-5")
 
-vars <- c("soc")
+vars <- c("bdod")
 grid <- expand.grid(lon=X, lat=Y)
 
 files <- list() ; files_not_downloaded <- list() ; compt <- 1

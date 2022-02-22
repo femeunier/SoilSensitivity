@@ -1,0 +1,133 @@
+rm(list = ls())
+
+library(dplyr)
+library(tidyr)
+library(purrr)
+library(rrtm)
+library(ED2scenarios)
+library(PEcAn.ED2)
+library(purrr)
+library(ggplot2)
+library(ggridges)
+library(cowplot)
+library(pracma)
+library(BayesianTools)
+library(raster)
+library(rhdf5)
+library(stringr)
+
+ED_REG_LATMIN = -19.5
+ED_REG_LATMAX =  13.5
+ED_REG_LONMIN = -84.5
+ED_REG_LONMAX = -30.5
+
+GRID_RES = 1
+
+fyear = 2010
+
+X = seq(ED_REG_LONMIN,ED_REG_LONMAX,GRID_RES)
+Y = seq(ED_REG_LATMIN,ED_REG_LATMAX,GRID_RES)
+
+ref_dir <- "/data/gent/vo/000/gvo00074/pecan/output/other_runs/SoilSensitivity/run"
+rundir <- "/data/gent/vo/000/gvo00074/pecan/output/other_runs/SoilSensitivity/run/grid"
+ICdir <- "/data/gent/vo/000/gvo00074/pecan/output/other_runs/LSliana/IC/"
+outdir <- "/kyukon/scratch/gent/vo/000/gvo00074/felicien/SoilSensitivity/out"
+
+scenars <- c("SoilGrids_mean","SoilGrids_min","SoilGrids_max")
+
+land <- readRDS(file.path("maps","landmask.RDS"))
+
+df.restart <- data.frame()
+
+Nsimuperjob = 60
+isimu = 0
+
+list_dir <- list()
+ed_exec <- "/user/scratchkyukon/gent/gvo000/gvo00074/felicien/ED2/ED/build/ed_2.1-opt-master-2bb6872"
+
+all_depths <- c(-8,-7,-6.2,-5.5,-4.9,-4.3,-3.8,-3.3,-2.8,-2.3,-1.8,-1.3,-1,-0.6,-0.3,-0.15)
+
+df.temp <- data.frame()
+
+for(ix in seq(1,length(X))){
+  for(iy in seq(1,length(Y))){
+    clat = Y[iy]; clon = X[ix]
+
+    if (land[which(rownames(land)==clon),which(colnames(land)==clat)] != 0){
+      for (iscenar in seq(1,length(scenars))){
+
+        run_name <- paste0("SoilSens_Amazon_historical_",scenars[iscenar],"_X_",abs(X[ix]),ifelse(X[ix]<0,"W","E"),
+                           "_Y_",abs(Y[iy]),ifelse(Y[iy]<0,"S","N"))
+
+        # run_origin <- paste0("SoilSens_Amazon_IC_",scenars[iscenar],"_X_",abs(X[ix]),ifelse(X[ix]<0,"W","E"),
+        #                      "_Y_",abs(Y[iy]),ifelse(Y[iy]<0,"S","N"))
+        #
+        # run_name <- paste0("SoilSens_Amazon_IC_",scenars[iscenar],"_X_",abs(X[ix]),ifelse(X[ix]<0,"W","E"),
+        #                    "_Y_",abs(Y[iy]),ifelse(Y[iy]<0,"S","N"))
+
+        run_ref <- file.path(rundir,run_name)
+        out_ref <- file.path(outdir,run_name)
+
+        ed2in <- read_ed2in(file.path(run_ref,"ED2IN"))
+
+        isimu <- isimu + 1
+
+        history.file <- file.path(out_ref,"histo","history-S-2010-01-01-000000-g01.h5")
+        if (file.exists(history.file)){
+          ed2in$RUNTYPE <- "HISTORY"
+          ed2in$IED_INIT_MODE <- 6
+          ed2in$SFILIN <- file.path(out_ref,"histo","history")
+          ed2in$ITIMEH <- 0
+          ed2in$IDATEH <- 1
+          ed2in$IMONTHH <- 1
+          ed2in$IYEARH <- fyear
+          ed2in$IMETAVG <- 3
+
+          # Output year/month
+          ed2in$IMONTHZ = 1
+          ed2in$IYEARA = fyear
+          ed2in$IYEARZ = fyear + 1
+          ed2in$IQOUTPUT = 3
+
+          ed2in$FRQSTATE = 1
+
+          write_ed2in(ed2in,filename = file.path(run_ref,"ED2IN"))
+
+          if (isimu == 1){
+            isfirstjob = TRUE
+            dir_joblauncher = run_ref
+            list_dir[[run_name]] = run_ref
+          } else{
+            isfirstjob = FALSE
+          }
+
+          # job.sh
+          write_joblauncher_noR_status(file =  file.path(dir_joblauncher,"job_analysis.sh"),
+                                       nodes = 1,ppn = 18,mem = 16,walltime = 24,
+                                       prerun = "ml purge ; ml UDUNITS/2.2.26-intel-2018a R/3.4.4-intel-2018a-X11-20180131 HDF5/1.10.1-intel-2018a; ulimit -s unlimited",
+                                       CD = run_ref,
+                                       ed_exec = ed_exec,
+                                       ED2IN = "ED2IN",
+                                       firstjob = isfirstjob,
+                                       CD.main = dir_joblauncher,
+                                       remove = FALSE)
+
+
+          if (isimu == Nsimuperjob){
+            isimu = 0
+          }
+        } else {
+
+          df.temp <- bind_rows(list(df.temp,
+                                    data.frame(run = run_name)))
+        }
+      }
+    }
+  }
+}
+
+dumb <- write_bash_submission(file = file.path(rundir,"all_jobs_analysis.sh"),
+                              list_files = list_dir,
+                              job_name = "job_analysis.sh")
+
+# scp /home/femeunier/Documents/projects/SoilSensitivity/scripts/restart_analysis_file.R hpc:/data/gent/vo/000/gvo00074/felicien/R

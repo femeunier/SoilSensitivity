@@ -37,11 +37,11 @@ ed2in$IYEARA = 1900
 
 ed2in$IMONTHZ = 2
 ed2in$IDATEZ = 1
-ed2in$IYEARZ = 1930
+ed2in$IYEARZ = 1950
 
 cssfile_base <- "Amazon"
 
-ed2in$IMETAVG = -1
+ed2in$IMETAVG = 3
 
 list_dir <- list()
 # load landmask here
@@ -198,7 +198,7 @@ for(ix in seq(1,length(X))){
 
         # job.sh
         write_joblauncher_noR_status(file =  file.path(dir_joblauncher,"job.sh"),
-                                     nodes = 1,ppn = 18,mem = 16,walltime = 12,
+                                     nodes = 1,ppn = 18,mem = 16,walltime = 24,
                                      prerun = "ml purge ; ml UDUNITS/2.2.26-intel-2018a R/3.4.4-intel-2018a-X11-20180131 HDF5/1.10.1-intel-2018a; ulimit -s unlimited",
                                      CD = run_ref,
                                      ed_exec = ed_exec,

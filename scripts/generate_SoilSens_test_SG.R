@@ -15,11 +15,10 @@ library(pracma)
 library(BayesianTools)
 library(raster)
 
-ED_REG_LATMIN = -19.5
-ED_REG_LATMAX =  13.5
-ED_REG_LONMIN = -84.5
-ED_REG_LONMAX = -30.5
-
+ED_REG_LATMIN = -10.5
+ED_REG_LATMAX = -0.5
+ED_REG_LONMIN = -60.5
+ED_REG_LONMAX = -50.5
 GRID_RES = 1
 
 X = seq(ED_REG_LONMIN,ED_REG_LONMAX,GRID_RES)
@@ -37,15 +36,15 @@ ed2in$IYEARA = 1900
 
 ed2in$IMONTHZ = 1
 ed2in$IDATEZ = 2
-ed2in$IYEARZ = 1905
+ed2in$IYEARZ = 2000
 
-ed2in$IMETAVG = 0
+ed2in$IMETAVG = 3
 
 list_dir <- list()
 # load landmask here
 land <- readRDS(file.path("maps","landmask.RDS"))
 
-Nsimuperjob = 10
+Nsimuperjob = 3
 isimu = 0
 
 defaults <- list()
@@ -185,7 +184,7 @@ for(ix in seq(1,length(X))){
 
         # job.sh
         write_joblauncher_noR_status(file =  file.path(dir_joblauncher,"job.sh"),
-                          nodes = 1,ppn = 18,mem = 16,walltime = 12,
+                          nodes = 1,ppn = 18,mem = 16,walltime = 24,
                           prerun = "ml purge ; ml UDUNITS/2.2.26-intel-2018a R/3.4.4-intel-2018a-X11-20180131 HDF5/1.10.1-intel-2018a; ulimit -s unlimited",
                           CD = run_ref,
                           ed_exec = ed_exec,

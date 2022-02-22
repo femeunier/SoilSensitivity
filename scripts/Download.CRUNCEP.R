@@ -7,7 +7,7 @@ library(ncdf4)
 outfolder <- "/home/carya/output/dbfiles/Test"
 outfolder <- "/data/gent/vo/000/gvo00074/ED_common_data/met/CRUNCEP"
 
-years <- 1901:1910
+years <- 1921:2010
 
 lat.in <- -20
 Delta_lat <- 35
@@ -115,6 +115,7 @@ for (i in seq(1,length(years))){
   ncdf4::nc_close(loc)
 }
 
+# scp /home/femeunier/Documents/projects/SoilSensitivity/scripts/Download.CRUNCEP.R hpc:/kyukon/data/gent/vo/000/gvo00074/felicien/R
 
 
 

@@ -2,7 +2,6 @@ rm(list = ls())
 
 library(dplyr)
 library(tidyr)
-library(PEcAnRTM)
 library(purrr)
 library(rrtm)
 library(ED2scenarios)
@@ -16,8 +15,6 @@ library(BayesianTools)
 library(raster)
 library(rhdf5)
 library(stringr)
-
-source("/data/gent/vo/000/gvo00074/felicien/R/h5read_opt.r")
 
 ED_REG_LATMIN = -19.5
 ED_REG_LATMAX =  13.5
@@ -34,7 +31,7 @@ rundir <- "/data/gent/vo/000/gvo00074/pecan/output/other_runs/SoilSensitivity/ru
 ICdir <- "/data/gent/vo/000/gvo00074/pecan/output/other_runs/LSliana/IC/"
 outdir <- "/kyukon/scratch/gent/vo/000/gvo00074/felicien/SoilSensitivity/out"
 
-scenars <- c("SoilGrids_mean")
+scenars <- c("SoilGrids_mean","SoilGrids_min","SoilGrids_max")
 
 land <- readRDS(file.path("maps","landmask.RDS"))
 
@@ -48,7 +45,7 @@ for(ix in seq(1,length(X))){
 
       for (iscenar in seq(1,length(scenars))){
 
-        run_name <- paste0("SoilSens_Amazon_",scenars[iscenar],"_X_",abs(X[ix]),ifelse(X[ix]<0,"W","E"),
+        run_name <- paste0("SoilSens_Amazon_IC_",scenars[iscenar],"_X_",abs(X[ix]),ifelse(X[ix]<0,"W","E"),
                            "_Y_",abs(Y[iy]),ifelse(Y[iy]<0,"S","N"))
 
         run_ref <- file.path(rundir,run_name)
@@ -72,9 +69,20 @@ for(ix in seq(1,length(X))){
           }
         }
 
+        if (status %in% c("Error","Started")){
+          details.file <- file.info(list.files(path = file.path(out_ref,"histo"), full.names = TRUE,pattern = ".h5"))
+          files.OP.ordered <- details.file[with(details.file, order(as.POSIXct(mtime),decreasing = TRUE)), ]
+          fyear <- as.numeric(str_split(basename(rownames(files.OP.ordered)[1]),pattern = "-")[[1]][3])
+
+        } else if (status == "Success") {
+          fyear <- 1930
+        } else {
+          fyear <-1900
+        }
+
         df.status <- data.frame(scenario = scenars[iscenar],
                                 lat,lon,
-                                status)
+                                status,final.year = fyear)
         status.all <- bind_rows(list(status.all,
                                      df.status))
       }
@@ -85,6 +93,3 @@ for(ix in seq(1,length(X))){
 saveRDS(status.all,"status.all.RDS")
 
 # scp /home/femeunier/Documents/projects/SoilSensitivity/scripts/Check.status.R hpc:/data/gent/vo/000/gvo00074/felicien/R
-
-# ED execution halts (see previous error message)
-# ED-2.2 execution ends
